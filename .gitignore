@@ -1,4 +1,2 @@
-.zig-cache/
-zig-out/
-*.o
-.bin/
+node_modules/
+.env
