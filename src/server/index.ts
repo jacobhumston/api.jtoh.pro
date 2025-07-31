@@ -13,23 +13,77 @@
  */
 
 import { Hono } from 'hono';
-import { serve } from 'bun';
+import { randomUUIDv7, serve } from 'bun';
 import { loadConfigurationFromArgv, logHelpMessage } from './modules/config';
 import logger from './modules/logger';
 import process from 'node:process';
+import type { WorkerEvent, WorkerEventOfType } from './modules/types';
 
 // Create a Hono application as well as load configuration.
 const application = new Hono();
+const apiApplication = new Hono();
 const config = loadConfigurationFromArgv();
 
-// TODO: Move this somewhere else.
-if (!process.env.proxy || process.env.proxy.length < 1) logger.warn('[.env].proxy was not provided!');
+// Create workers.
+const workers: Array<Worker> = [];
+for (let i = 0; i < config.taskThreads; i++) {
+    const worker = new Worker(new URL('./worker.ts', import.meta.url).href);
+
+    // We will go ahead an attach the logger event here so we don't have to do it later.
+    worker.addEventListener('message', (event: WorkerEvent) => {
+        const request = event.data;
+        if (request.type === 'Log') {
+            logger.log('info', request.message);
+        }
+    });
+
+    workers.push(worker);
+}
 
 // If the help message is requested, then log it and exit.
 if (config.helpMessage === true) {
     logHelpMessage();
     process.exit();
 }
+
+// TODO: Organize this, currently testing.
+apiApplication.get('/badges/:userId/:badgeIds', async (context) => {
+    const providedUserId = context.req.param('userId');
+    const providedBadgeIds = context.req.param('badgeIds');
+
+    const userId = parseInt(providedUserId);
+    const badgeIds = providedBadgeIds.split(',').map(parseInt);
+
+    if (badgeIds.length > 5000) return context.json({ error: 'Too many badges, max is 400.' }, 400);
+
+    const badgeIdSets: Array<{ requestId: string, ids: Array<number> }> = [];
+    while (badgeIds.length) {
+        badgeIdSets.push({ requestId: randomUUIDv7(), ids: badgeIds.splice(0, 100) });
+    }
+
+    const parsedBadges: WorkerEventOfType<"RobloxBadgesResponse">["badges"] = [];
+    let workerIndex = -1;
+
+    for (const badgeSet of badgeIdSets) {
+        workerIndex++;
+        let worker = workers[workerIndex];
+        if (!worker) {
+            workerIndex = 0;
+            worker = workers[0];
+        }
+
+        const request: WorkerEventOfType<"">
+    }
+
+    while (parsedBadges.length !== badgeIdSets.length) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    return context.json({ userId: userId, badges: parsedBadges })
+});
+
+// Route API endpoints.
+application.route('/api', apiApplication);
 
 // Serve the API using 'Bun.serve()'.
 serve({

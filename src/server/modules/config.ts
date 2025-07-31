@@ -1,6 +1,6 @@
 /**
  * This file exposes a function to load configuration
- * options from the command line. It will automatically
+ * options from the command line and ENV. It will automatically
  * provided default values if needed.
  *
  * The help message is also included in this file because
@@ -11,6 +11,7 @@
  */
 
 import { argv } from 'bun';
+import { env } from 'process';
 
 /**
  * Configuration object.
@@ -90,4 +91,19 @@ export function loadConfigurationFromArgv(): Configuration {
     if (isNaN(taskThreads)) taskThreads = 2;
 
     return { port, reusePort, helpMessage, taskThreads };
+}
+
+/** Environment configuration. This will be configuration options that are more sensitive. */
+export interface EnvConfiguration {
+    proxy?: string;
+}
+
+/**
+ * Load environment configuration.
+ * @returns The environment configuration.
+ */
+export function loadConfigurationFromEnv() {
+    return {
+        proxy: env.proxy ?? undefined
+    };
 }
