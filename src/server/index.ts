@@ -102,7 +102,12 @@ apiApplication.post('/badges/:userId', async (context) => {
         await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    return context.json({ time: performance.now() - time, badgeCount: parsedBadges.length, userId: userId, badges: parsedBadges });
+    return context.json({
+        time: performance.now() - time,
+        badgeCount: parsedBadges.length,
+        userId: userId,
+        badges: parsedBadges
+    });
 });
 
 // Route API endpoints.
