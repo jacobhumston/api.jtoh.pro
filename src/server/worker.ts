@@ -34,7 +34,7 @@ function postMessage(data: WorkerEvents) {
 function log(message: string) {
     return postMessage({
         type: 'Log',
-        message: message,
+        message: `[${threadId}]: ${message}`,
         id: '@', // ID is completely ignored for log events.
         retries: 0
     });
@@ -70,4 +70,6 @@ self.addEventListener('message', async (event: WorkerEvent) => {
 });
 
 // Log that the worker was created.
-log(`Worker created! (${threadId})`);
+log('Worker created!');
+
+if (!env.proxy) log('Working running without a proxy!');

@@ -33,14 +33,22 @@ export async function handleRobloxBadgesRequests(
         | undefined;
     if (!responseJSON) return retry();
 
+    const badgesResult: WorkerEventOfType<'RobloxBadgesResponse'>['badges'] = responseJSON.data.map((badge) => ({
+        id: badge.badgeId,
+        owned: true,
+        awarded: new Date(badge.awardedDate as string),
+        cached: false
+    }));
+
+    badgesResult.push(
+        ...request.badges
+            .filter((id) => badgesResult.find((badge) => badge.id === id) === undefined)
+            .map((id) => ({ id: id, owned: false, awarded: null, cached: false }))
+    );
+
     return postMessage({
         type: 'RobloxBadgesResponse',
-        badges: responseJSON.data.map((badge) => ({
-            id: badge.badgeId,
-            owned: !!badge.awardedDate,
-            awarded: badge.awardedDate ? new Date(badge.awardedDate) : null,
-            cached: false
-        })),
+        badges: badgesResult,
         id: request.id,
         retries: request.retries,
         userId: request.userId

@@ -47,22 +47,26 @@ if (config.helpMessage === true) {
 }
 
 // TODO: Organize this, currently testing.
-apiApplication.get('/badges/:userId/:badgeIds', async (context) => {
+apiApplication.post('/badges/:userId', async (context) => {
+    const time = performance.now();
+
     const providedUserId = context.req.param('userId');
-    const providedBadgeIds = context.req.param('badgeIds');
+    const providedBadgeIds = await context.req.text();
 
     const userId = parseInt(providedUserId);
     const badgeIds = providedBadgeIds.split(',').map(parseInt);
 
-    if (badgeIds.length > 5000) return context.json({ error: 'Too many badges, max is 400.' }, 400);
+    //if (badgeIds.length > 5000) return context.json({ error: 'Too many badges, max is 400.' }, 400);
 
-    const badgeIdSets: Array<{ requestId: string, ids: Array<number> }> = [];
+    const badgeIdSets: Array<{ requestId: string; ids: Array<number> }> = [];
     while (badgeIds.length) {
         badgeIdSets.push({ requestId: randomUUIDv7(), ids: badgeIds.splice(0, 100) });
     }
 
-    const parsedBadges: WorkerEventOfType<"RobloxBadgesResponse">["badges"] = [];
+    const parsedBadges: WorkerEventOfType<'RobloxBadgesResponse'>['badges'] = [];
     let workerIndex = -1;
+    let requestsDone = 0;
+    let requestsTotal = 0;
 
     for (const badgeSet of badgeIdSets) {
         workerIndex++;
@@ -72,14 +76,33 @@ apiApplication.get('/badges/:userId/:badgeIds', async (context) => {
             worker = workers[0];
         }
 
-        const request: WorkerEventOfType<"">
+        requestsTotal++;
+
+        const request: WorkerEventOfType<'RobloxBadgesRequest'> = {
+            type: 'RobloxBadgesRequest',
+            userId: userId,
+            badges: badgeSet.ids,
+            id: badgeSet.requestId,
+            retries: 0
+        };
+        worker.postMessage(request);
+        worker.addEventListener('message', (event: WorkerEvent) => {
+            if (event.data.id === request.id && event.data.type === 'RobloxBadgesResponse') {
+                const response = event.data;
+                parsedBadges.push(...response.badges);
+                requestsDone++;
+            } else if (event.data.id === request.id && event.data.type === 'RequestFailed') {
+                logger.error(event.data);
+                requestsDone++;
+            }
+        });
     }
 
-    while (parsedBadges.length !== badgeIdSets.length) {
+    while (requestsTotal !== requestsDone) {
         await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    return context.json({ userId: userId, badges: parsedBadges })
+    return context.json({ time: performance.now() - time, badgeCount: parsedBadges.length, userId: userId, badges: parsedBadges });
 });
 
 // Route API endpoints.
@@ -89,7 +112,8 @@ application.route('/api', apiApplication);
 serve({
     port: config.port,
     reusePort: config.reusePort,
-    fetch: application.fetch
+    fetch: application.fetch,
+    idleTimeout: 255
 });
 
 // Very useful for debugging.

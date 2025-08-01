@@ -1,3 +1,4 @@
 {
-    "cSpell.words": ["jtoh"]
+    "cSpell.words": ["jtoh"],
+    "postman.settings.dotenv-detection-notification-visibility": false
 }
