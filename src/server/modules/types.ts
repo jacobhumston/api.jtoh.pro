@@ -17,16 +17,18 @@ type BaseWorkerEvent = {
 
 /** Available event types that a worker may encounter. */
 type WorkerEventTypes =
-    | { type: 'RobloxBadgesRequest'; badges: Array<number>; userId: number }
+    | { type: 'RobloxBadgesRequest'; badges: Array<string>; userId: number }
     | {
           type: 'RobloxBadgesResponse';
-          badges: Array<{ id: number; owned: boolean; awarded: Date | null; cached: boolean }>;
+          badges: Array<{ id: string; owned: boolean; awarded: Date | null; cached: boolean }>;
           userId: number;
       }
     | { type: 'RobloxBadgesRefreshRequest'; badges: Array<number>; userId: number }
     | { type: 'RobloxBadgesRefreshResponse'; badges: Array<{ id: number; refreshed: boolean }>; userId: number }
     | { type: 'RequestFailed'; error: string }
-    | { type: 'Log'; message: string };
+    | { type: 'Log'; message: string }
+    | { type: 'BusyStatusRequest' }
+    | { type: 'BusyStatusResponse'; isBusy: boolean };
 
 /** Worker events. */
 export type WorkerEvents = WorkerEventTypes & BaseWorkerEvent;

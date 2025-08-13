@@ -12,7 +12,7 @@ export const RobloxEndpoints = {
         /** Base for Roblox badges endpoints. */
         Base: 'https://badges.roblox.com/v1',
         /** Get the awarded dates for up to 100 badges for a user. */
-        AwardedDates(UserId: number, badges: Array<number>): string {
+        AwardedDates(UserId: number, badges: Array<string>): string {
             return `${this.Base}/users/${UserId}/badges/awarded-dates?badgeIds=${badges.join(',')}`;
         }
     }

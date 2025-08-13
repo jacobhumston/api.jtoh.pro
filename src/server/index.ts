@@ -54,11 +54,14 @@ apiApplication.post('/badges/:userId', async (context) => {
     const providedBadgeIds = await context.req.text();
 
     const userId = parseInt(providedUserId);
-    const badgeIds = providedBadgeIds.split(',').map(parseInt);
+    const badgeIds = providedBadgeIds
+        .split(',')
+        .map((id) => id.trim())
+        .map((id) => id.replace(/[^0-9]/g, ''));
 
     //if (badgeIds.length > 5000) return context.json({ error: 'Too many badges, max is 400.' }, 400);
 
-    const badgeIdSets: Array<{ requestId: string; ids: Array<number> }> = [];
+    const badgeIdSets: Array<{ requestId: string; ids: Array<string> }> = [];
     while (badgeIds.length) {
         badgeIdSets.push({ requestId: randomUUIDv7(), ids: badgeIds.splice(0, 100) });
     }
@@ -68,13 +71,47 @@ apiApplication.post('/badges/:userId', async (context) => {
     let requestsDone = 0;
     let requestsTotal = 0;
 
-    for (const badgeSet of badgeIdSets) {
+    async function getNextWorker() {
         workerIndex++;
         let worker = workers[workerIndex];
         if (!worker) {
-            workerIndex = 0;
-            worker = workers[0];
+            if (workers[workerIndex + 1]) {
+                workerIndex++;
+                worker = workers[workerIndex];
+            } else {
+                workerIndex = 0;
+                worker = workers[0];
+            }
         }
+
+        const busyId = randomUUIDv7();
+        let isBusy: null | boolean = null;
+
+        worker.postMessage({
+            type: 'BusyStatusRequest',
+            id: busyId,
+            retries: 0
+        });
+
+        worker.addEventListener('message', (event: WorkerEvent) => {
+            if (event.data.id === busyId && event.data.type === 'BusyStatusResponse') {
+                isBusy = event.data.isBusy;
+            }
+        });
+
+        while (isBusy === null) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        if (isBusy) {
+            return getNextWorker();
+        }
+
+        return worker;
+    }
+
+    for (const badgeSet of badgeIdSets) {
+        const worker = await getNextWorker();
 
         requestsTotal++;
 
@@ -85,7 +122,9 @@ apiApplication.post('/badges/:userId', async (context) => {
             id: badgeSet.requestId,
             retries: 0
         };
+
         worker.postMessage(request);
+
         worker.addEventListener('message', (event: WorkerEvent) => {
             if (event.data.id === request.id && event.data.type === 'RobloxBadgesResponse') {
                 const response = event.data;

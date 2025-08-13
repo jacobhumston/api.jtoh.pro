@@ -40,6 +40,8 @@ function log(message: string) {
     });
 }
 
+let isBusy = false;
+
 // Listen for requests.
 self.addEventListener('message', async (event: WorkerEvent) => {
     const request = event.data;
@@ -61,12 +63,27 @@ self.addEventListener('message', async (event: WorkerEvent) => {
         }, 1000);
     }
 
+    if (request.type === 'BusyStatusRequest') {
+        return postMessage({
+            type: 'BusyStatusResponse',
+            isBusy,
+            id: request.id,
+            retries: request.retries
+        });
+    }
+
+    let res;
+    isBusy = true;
+
     // TODO: Implement caching.
     if (request.type === 'RobloxBadgesRequest') {
-        return handleRobloxBadgesRequests(request, env, retry, postMessage);
+        res = await handleRobloxBadgesRequests(request, env, retry, postMessage, log);
     } else if (request.type === 'RobloxBadgesRefreshRequest') {
         // TODO: Implement badge refreshes.
     }
+
+    isBusy = false;
+    return res;
 });
 
 // Log that the worker was created.
